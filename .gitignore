@@ -1,0 +1,5 @@
+.build/
+.tmp/
+dist/
+.sigtest/
+.DS_Store
