@@ -43,7 +43,7 @@ struct ContentView: View {
 
             Spacer(minLength: 0)
 
-            Text("关闭开关或退出应用即可立即恢复键盘输入")
+            Text("按 \(KeyboardCleaner.restoreShortcut)、关闭开关或退出应用即可恢复键盘")
                 .font(.footnote)
                 .foregroundStyle(.tertiary)
         }
@@ -68,7 +68,15 @@ struct ContentView: View {
     }
 
     private var enabledBanner: some View {
-        Label("键盘输入已关闭，可以开始清洁", systemImage: "checkmark.shield.fill")
+        Label {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("键盘输入已关闭，可以开始清洁")
+                Text("按 \(KeyboardCleaner.restoreShortcut) 恢复键盘（后台也有效）")
+                    .fontWeight(.semibold)
+            }
+        } icon: {
+            Image(systemName: "checkmark.shield.fill")
+        }
             .font(.callout)
             .foregroundStyle(.green)
             .padding(14)

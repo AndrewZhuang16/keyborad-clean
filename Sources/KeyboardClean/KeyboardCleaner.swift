@@ -6,13 +6,15 @@ import CoreGraphics
 ///
 /// When enabled, an active `CGEvent` tap is installed at the head of the
 /// session event stream. Every keyboard event (`keyDown`, `keyUp`,
-/// `flagsChanged`) is dropped by returning `nil` from the callback, which
+/// `flagsChanged`) is dropped except for the emergency restore shortcut, which
 /// makes the keyboard effectively dead system-wide while the mouse keeps
 /// working. Disabling (or the app quitting / crashing) tears the tap down, so
 /// the keyboard is always restored automatically.
 final class KeyboardCleaner: ObservableObject {
 
     static let shared = KeyboardCleaner()
+
+    static let restoreShortcut = "⌃⌥⌘ Esc"
 
     /// True while the keyboard is being suppressed.
     @Published private(set) var isEnabled = false
@@ -111,8 +113,28 @@ final class KeyboardCleaner: ObservableObject {
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: mask,
-            callback: { _, _, _, _ in nil },
-            userInfo: nil
+            callback: { _, type, event, userInfo in
+                guard let userInfo else { return nil }
+                let cleaner = Unmanaged<KeyboardCleaner>.fromOpaque(userInfo).takeUnretainedValue()
+
+                // Fail open if macOS disables the tap, keeping the UI in sync.
+                if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+                    cleaner.disable()
+                    return Unmanaged.passUnretained(event)
+                }
+
+                // Read the physical modifiers before their events are suppressed.
+                let modifiers: CGEventFlags = [.maskControl, .maskAlternate, .maskCommand, .maskShift]
+                let required: CGEventFlags = [.maskControl, .maskAlternate, .maskCommand]
+                if type == .keyDown,
+                   event.getIntegerValueField(.keyboardEventKeycode) == 53,
+                   event.flags.intersection(modifiers) == required {
+                    cleaner.disable()
+                }
+                // Consume the restore key as well so Esc does not reach other apps.
+                return nil
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
             lastError = "已获得辅助功能权限，但创建键盘拦截失败，请重试或重启应用。"
             return false
